@@ -99,18 +99,19 @@ def build_command(
         decode=True,
         **extra_args
     )
-    failed = False
+    success = False
     last_error = None
     for output in build_output:
         stream = output.get("stream", None)
         message = output.get("message", None)
         error_detail = output.get("errorDetail", None)
         if error_detail:
-            failed = True
             last_error = error_detail["message"]
             typer.echo(error_detail["message"], err=True)
         if (stream or message) is not None:
             typer.echo(stream or message)
+        if stream and "Successfully built" in stream:
+            success = True
 
-    if failed:
-        raise DockerBuildFailed(last_error)
+    if last_error or not success:
+        raise DockerBuildFailed(last_error or "Unknown error")
