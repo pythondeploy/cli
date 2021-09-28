@@ -5,6 +5,10 @@ class CloudFormationTransofrmationFailed(Exception):
     """The changes to CloudFormation failed to apply."""
 
 
+class DockerBuildFailed(Exception):
+    """Building the docker image failed."""
+
+
 class ECRPushFailed(Exception):
     """Pushing the image to ECR failed."""
 

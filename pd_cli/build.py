@@ -6,6 +6,8 @@ from typing import Any, Dict, Optional
 import docker
 import typer
 
+from pd_cli.exceptions import DockerBuildFailed
+
 
 def build_context_path_callback(value: Path) -> Path:
     """Ensure that the build_context_path is a directory."""
@@ -90,7 +92,6 @@ def build_command(
     extra_args.pop("dockerfile", None)
     extra_args.pop("decode", None)
 
-    print(str(build_context_path.absolute()))
     build_output = docker_client.api.build(
         tag=image_tag,
         path=str(build_context_path.resolve()),
@@ -98,8 +99,18 @@ def build_command(
         decode=True,
         **extra_args
     )
+    failed = False
+    last_error = None
     for output in build_output:
         stream = output.get("stream", None)
         message = output.get("message", None)
+        error_detail = output.get("errorDetail", None)
+        if error_detail:
+            failed = True
+            last_error = error_detail["message"]
+            typer.echo(error_detail["message"], err=True)
         if (stream or message) is not None:
             typer.echo(stream or message)
+
+    if failed:
+        raise DockerBuildFailed(last_error)
