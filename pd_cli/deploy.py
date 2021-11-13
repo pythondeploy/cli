@@ -8,7 +8,7 @@ import docker
 import typer
 from boto3 import Session
 
-from .exceptions import CloudFormationTransofrmationFailed, ECRPushFailed
+from .exceptions import CloudFormationTransformationFailed, ECRPushFailed
 from .helpers import api_request, get_aws_account_information
 
 
@@ -94,7 +94,7 @@ def cloud_formation_wait(aws_account: Dict[str, Any]) -> None:
     has been deployed to the functions.
 
     If the changes fail to be applied, an exception is raised.
-    - pd_cli.exceptions.CloudFormationTransofrmationFailed
+    - pd_cli.exceptions.CloudFormationTransformationFailed
     """
     for sleep_time in exponential():
         typer.echo("Waiting for CloudFormation changes")
@@ -122,7 +122,7 @@ def cloud_formation_wait(aws_account: Dict[str, Any]) -> None:
         "UPDATE_COMPLETE_CLEANUP_IN_PROGRESS",
         "UPDATE_COMPLETE",
     ]:
-        raise CloudFormationTransofrmationFailed(stack_status)
+        raise CloudFormationTransformationFailed(stack_status)
 
 
 def deploy_command(

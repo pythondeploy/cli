@@ -1,7 +1,7 @@
 """Define exceptions for PD CLI package."""
 
 
-class CloudFormationTransofrmationFailed(Exception):
+class CloudFormationTransformationFailed(Exception):
     """The changes to CloudFormation failed to apply."""
 
 
