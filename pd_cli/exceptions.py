@@ -1,4 +1,4 @@
-"""Define exceptions for PD Aws Lambda package."""
+"""Define exceptions for PD CLI package."""
 
 
 class CloudFormationTransofrmationFailed(Exception):

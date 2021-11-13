@@ -1,4 +1,4 @@
-"""CLI command to deploy a Docker image to the Lambda Functions."""
+"""CLI command to deploy a Docker image to the Python Deploy applications."""
 import os
 from base64 import b64decode
 from time import sleep, time
@@ -67,10 +67,10 @@ def push_to_ecr(aws_account: Dict[str, Any], image_tag: str) -> str:
     return docker_image_uri
 
 
-def lambda_update(app_id: str, api_key: str, image_uri: str) -> None:
-    """Push the uploaded code to the Lambda functions using PythonDeploy."""
-    typer.echo("Deploying docker image to Lambda functions")
-    api_request(app_id, api_key, "lambda_deploy", {"image_uri": image_uri})
+def application_update(app_id: str, api_key: str, image_uri: str) -> None:
+    """Update the Python Deploy application."""
+    typer.echo("Deploying the docker image to the application")
+    api_request(app_id, api_key, "application_deploy", {"image_uri": image_uri})
 
 
 def exponential() -> Generator[int, None, None]:
@@ -147,10 +147,10 @@ def deploy_command(
         ),
     ),
 ) -> None:
-    """Deploy a Docker image to your Python Deploy Lambda functions."""
+    """Deploy a Docker image to your Python Deploy application."""
     aws_account = get_aws_account_information(app_id, api_key)
 
     image_uri = push_to_ecr(aws_account, image_tag)
-    lambda_update(app_id, api_key, image_uri)
+    application_update(app_id, api_key, image_uri)
     if wait:
         cloud_formation_wait(aws_account)
