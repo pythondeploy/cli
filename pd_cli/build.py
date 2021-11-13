@@ -87,7 +87,6 @@ def build_command(
     docker_client = docker.from_env()
 
     extra_args.pop("tag", None)
-    extra_args.pop("tag", None)
     extra_args.pop("path", None)
     extra_args.pop("dockerfile", None)
     extra_args.pop("decode", None)
