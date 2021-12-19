@@ -1,8 +1,9 @@
 """CLI command to run shell commands on a Lambda Function."""
 import json
 import os
+import subprocess
 from pprint import pformat
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import typer
 from boto3 import Session
@@ -11,8 +12,75 @@ from .exceptions import LambdaInvocationFailed, ShellCommandFailed, UnexpectedRe
 from .helpers import get_aws_account_information
 
 
-def run_shell(
-    shell_args: Optional[List[str]], log_result: bool, app_id: str, api_key: str
+def run_fargate_shell(
+    aws_account: Dict[str, Any], shell_args: Optional[List[str]]
+) -> None:
+    """
+    Run a shell command in an ECS container through aws ecs exec-command.
+
+    `stdout` and and `stderr` from the ran command are printed locally
+    to stdout. The output comes from the AWS CLI `exec-command`.
+
+    A `ShellCommandFailed` exception is raised if it is not possible
+    to execute the command.
+
+    The return code of the command is not captured. The output needs to
+    be parsed in order to detect if the command executed properly or not.
+    """
+
+    ecs_client = Session(
+        aws_access_key_id=aws_account["credentials"]["aws_access_key_id"],
+        aws_secret_access_key=aws_account["credentials"]["aws_secret_access_key"],
+        aws_session_token=aws_account["credentials"]["aws_session_token"],
+        region_name=aws_account["credentials"]["region_name"],
+    ).client("ecs")
+    task_arn = ecs_client.list_tasks(
+        cluster=aws_account["ecs_cluster"],
+        serviceName=aws_account["worker_service"] or aws_account["web_service"],
+    )["taskArns"][0]
+
+    process = subprocess.Popen(
+        [
+            "aws",
+            "ecs",
+            "execute-command",
+            "--cluster",
+            aws_account["ecs_cluster"],
+            "--task",
+            task_arn,
+            "--container",
+            "WebContainer",
+            "--interactive",
+            "--command",
+            " ".join(shell_args),
+        ],
+        env={
+            **os.environ,
+            **{
+                "AWS_ACCESS_KEY_ID": aws_account["credentials"]["aws_access_key_id"],
+                "AWS_SECRET_ACCESS_KEY": aws_account["credentials"][
+                    "aws_secret_access_key"
+                ],
+                "AWS_SESSION_TOKEN": aws_account["credentials"]["aws_session_token"],
+                "AWS_REGION": aws_account["credentials"]["region_name"],
+            },
+        },
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+
+    success = True
+    for line in iter(lambda: process.stdout.readline(), b""):
+        if b"----------ERROR-------" in line:
+            success = False
+        typer.echo(line.rstrip())
+
+    if not success:
+        raise ShellCommandFailed("Shell command failed")
+
+
+def run_lambda_shell(
+    aws_account: Dict[str, Any], shell_args: Optional[List[str]], log_result: bool
 ) -> None:
     """
     Run a shell command in the Tasks lambda function.
@@ -25,8 +93,6 @@ def run_shell(
     If the lambda function fails to execute or it is not possible to execute
     the shell command, an exception is raised.
     """
-    aws_account = get_aws_account_information(app_id, api_key)
-
     lambda_client = Session(
         aws_access_key_id=aws_account["credentials"]["aws_access_key_id"],
         aws_secret_access_key=aws_account["credentials"]["aws_secret_access_key"],
@@ -70,10 +136,11 @@ def run_shell(
 
 
 def run_command(
-    shell_args: Optional[List[str]] = typer.Argument(
-        None, help="Arguments to pass to the `subprocess.run()` method."
+    shell_args: Optional[List[str]] = typer.Argument(None, help="Command to execute."),
+    log_result: bool = typer.Option(
+        False,
+        help="Log the results into AWS CloudWatch. (Only for Lambda applications)",
     ),
-    log_result: bool = typer.Option(False, help="Log the results into AWS CloudWatch."),
     app_id: str = typer.Option(
         os.environ.get("PD_APP_ID"),
         help="PythonDeploy application id. Default: environment variable PD_APP_ID",
@@ -83,5 +150,42 @@ def run_command(
         help="PythonDeploy api key. Default: environment variable PD_API_KEY",
     ),
 ) -> None:
-    """Execute shell commands in your Lambda Task function."""
-    run_shell(shell_args, log_result, app_id, api_key)
+    """
+    Execute a remote commands in your application.
+
+    ---
+
+    For Fargate applications, run a shell command in an ECS container through
+    `aws ecs exec-command`.
+
+    `stdout` and and `stderr` from the ran command are printed locally
+    to stdout. The output comes from the AWS CLI `exec-command`.
+
+    A `ShellCommandFailed` exception is raised if it is not possible
+    to execute the command.
+
+    The return code of the command is not captured. The output needs to
+    be parsed in order to detect if the command executed properly or not.
+
+    ---
+
+    For Lambda applications, run a shell command in the Tasks lambda function.
+
+    `stdout` and and `stderr` from the ran command are printed locally
+    in their corresponding stream.
+
+    The python process exits with the same return code from the command.
+
+    If the lambda function fails to execute or it is not possible to execute
+    the shell command, an exception is raised.
+
+
+    """
+    aws_account = get_aws_account_information(app_id, api_key)
+    if aws_account["manager"] == "LambdaFunctionManager":
+        run_lambda_shell(aws_account, shell_args, log_result)
+        return
+
+    if aws_account["manager"] == "FargateFunctionManager":
+        run_fargate_shell(aws_account, shell_args)
+        return
