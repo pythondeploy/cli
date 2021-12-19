@@ -44,7 +44,7 @@ def json_args_callback(value: str) -> Optional[Dict[Any, Any]]:
 def build_command(
     image_tag: str = typer.Argument(
         ...,
-        help="Local docker image tag to be deployed",
+        help="Docker image tag",
     ),
     build_context_path: Path = typer.Argument(
         Path(),
@@ -106,9 +106,9 @@ def build_command(
         error_detail = output.get("errorDetail", None)
         if error_detail:
             last_error = error_detail["message"]
-            typer.echo(error_detail["message"], err=True)
+            typer.echo(error_detail["message"].rstrip(), err=True)
         if (stream or message) is not None:
-            typer.echo(stream or message)
+            typer.echo((stream or message).rstrip())
         if stream and "Successfully built" in stream:
             success = True
 
